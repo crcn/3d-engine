@@ -1,0 +1,33 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "sourceMap": true,
+    "lib": [
+      "es2015.promise",
+      "dom",
+      "es5",
+      "esnext"
+    ],
+    "module": "es6",
+    "outDir": "lib",
+    "jsx": "react",
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "noImplicitAny": true,
+    "target": "es5",
+    "allowJs": true
+  },
+  "exclude": [
+    "node_modules",
+    "*-test",
+    "*-old",
+    "lib",
+    "index.d.ts"
+  ],
+  "filesGlob": [
+    "./src/*.ts"
+  ],
+  "rootDirs": [
+    "node_modules"
+  ]
+}
