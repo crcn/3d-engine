@@ -26,7 +26,7 @@ export class Runtime {
     }
     this._tickObservable.dispatch(this._tick);
     this._tick += 0.05;
-    requestAnimationFrame(this.tick);
+    setTimeout(this.tick, 20);
   }
   stop() {
     this._running = false;

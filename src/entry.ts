@@ -1,100 +1,176 @@
-import { Point } from "./point";
-import { Runtime } from "./runtime";
 
-class Camera {
-  public roll: number = 0;
-  public pitch: number = 0;
-  public yaw: number = 0;
-  public zoom: number = 100;
-  public point: Point = {x: 0, y: 0, z: 0};
-  constructor() {
 
-  }
-  rotate(step: number = 1) {
-    this.roll = (this.roll + step) % 360;
-    return this;
-  }
+const DPI = 96;
+const IN_IN_MM = 25.4;
+const PIXEL_MM_RATIO = IN_IN_MM / DPI;
+
+
+type Vertex = [number, number, number];
+type Face = Vertex[];
+
+const canvas = document.createElement("canvas");
+document.body.appendChild(canvas);
+canvas.width = 1000;
+canvas.height = 1000;
+
+
+let vertices: Vertex[] = [
+
+  [0, 0, 0],
+  [100, 0, 0],
+  [100, 100, 0],
+  [0, 100, 0],
+
+  [0, 0, 100],  
+  [100, 0, 100],
+  [100, 100, 100],
+  [0, 100, 100]
+];
+
+vertices = moveVertices(vertices, calcVerticesCenter(vertices));
+
+const faces: Face[] = [
+
+  // front
+  [vertices[0], vertices[1], vertices[2], vertices[3]],
+
+  // right
+  [vertices[1], vertices[5], vertices[6], vertices[2]],
+
+  // back
+  [vertices[4], vertices[5], vertices[6], vertices[7]],
+  
+  // top
+  [vertices[0], vertices[4], vertices[5], vertices[1]],
+
+  // left
+  [vertices[0], vertices[3], vertices[7], vertices[4]],
+
+  // bottom
+  [vertices[2], vertices[3], vertices[7], vertices[6]],
+];
+
+const FPS = 1000 / 30;
+
+
+let pitch = 0;//degToRad(45);
+let roll = 0;//degToRad(90);
+let yaw = 0;//degToRad(45);
+let tick = 0;
+let tick2 = 0;
+
+const nextFrame = () => {
+
+  pitch = degToRad(tick % 360);
+  yaw = degToRad(tick % 360);
+  // roll = degToRad(tick % 360);
+  tick++;
+  const newFaces = faces.map(face => {
+    return moveVertices(face.map(vertex => rotateVertex(vertex, [pitch, yaw, roll])), [-200, -200, 0])
+  });
+
+  draw(newFaces);
+
+  setTimeout(nextFrame, FPS);
 }
 
-interface Shape {
-  element: HTMLElement;
-  update: (camera: Camera) => void;
-}
 
-class Dot implements Shape {
-  readonly element: HTMLElement;
-  constructor(public point: Point, public diameter: number = 10) {
-    this.element = document.createElement("div");
-    Object.assign(this.element.style, {
-      position: 'absolute',
-      borderRadius: `${this.diameter}px`,
-      width: `${diameter}px`,
-      height: `${diameter}px`,
-      background: `red`
-    });
-  }
-  update({point, pitch, yaw, roll}: Camera) {
+nextFrame();
 
-    // console.log(rotation / 360)
+function draw(faces: Face[]) {
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const face of faces) {
 
-    const x = Math.cos(roll * Math.PI / 180) * this.point.z;
-    const y = Math.sin(roll * Math.PI / 180) * this.point.z;
-    
-    
-    Object.assign(this.element.style, {
-      left: `${x}px`,
-      top: `${y}px`
-    })
-  }
-}
-
-class Container implements Shape {
-  readonly element: HTMLElement;
-  private _children: Shape[];
-  constructor() {
-    this.element = document.createElement("div");
-    Object.assign(this.element.style, {
-      position: 'absolute',
-      left: '200px',
-      top: '200px'
-    });
-    this._children = [];
-  }
-  update(camera: Camera) {
-    for (const child of this._children) {
-      child.update(camera);
+    const start = face[0];
+    ctx.beginPath();
+    ctx.fillStyle = 'red';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.moveTo(start[0], start[1]);
+    for (let i = 1, {length} = face; i < length; i++) {
+      const [x, y] = face[i];
+      ctx.lineTo(x, y);
     }
-  }
-  addChild(child: Shape) {
-    this._children.push(child);
-    this.element.appendChild(child.element);
+    ctx.lineTo(start[0], start[1]);
+    ctx.stroke();
+    ctx.fill();
   }
 }
 
+function rotateVertex([x, y, z]: Vertex, [rx, ry, rz]: Vertex): Vertex {
 
-const container = new Container();
+  // rx
+  const x2 = x;
+  const y2 = y * Math.cos(rx) - z * Math.sin(rx);
+  const z2 = y * Math.sin(rx) + z * Math.cos(rx);
 
-const d1 = new Dot({ x: 0, y: 0, z: 0});
-const d2 = new Dot({ x: 100, y: 0, z: 100});
+  // ry
+  const x3 = x2 * Math.cos(ry) + z2 * Math.sin(ry);
+  const y3 = y2;
+  const z3 = x2 * -Math.sin(ry) + z2 * Math.cos(ry);
+
+  // rz
+  const x4 = x3 * Math.cos(rz) - y3 * Math.sin(rz);
+  const y4 = x3 * Math.sin(rz) + y3 * Math.cos(rz);
+  const z4 = z3;
+
+  return [x4, y4, z4];
+}
+
+function calcPoint(radius: number, theta: number, phi: number) {
+  const x = radius * Math.sin(theta) * Math.cos(phi);
+  const y = radius * Math.sin(theta) * Math.sin(phi);
+  const z = radius * Math.cos(theta);
+  return [x, y, z];
+}
+
+function calcTheta(radius: number, z: number) {
+  return Math.acos(z / radius);
+}
 
 
-container.addChild(d1);
-container.addChild(d2);
+function calcPhi(y: number, x: number) {
+  return Math.atan2(y, x);
+}
 
-document.body.appendChild(container.element);
+// console.log(calcPoint(70.7106, calcTheta(70.7106, -50), calcPhi(-50, 0)));
 
-const runtime = new Runtime();
-const camera = new Camera();
 
-camera.point.x = 0;
-camera.point.y = 0;
-camera.point.z = -100;
-camera.pitch = 0;
-camera.yaw = 0;
-camera.roll = 0;
+function calcVerticesCenter(vertices: Vertex[]): Vertex {
+  let ox = 0;
+  let oy = 0;
+  let oz = 0;
+  for (const [x, y, z] of vertices) {
+    ox += x;
+    oy += y;
+    oz += z;
+  }
 
-runtime.onTick(() => {
-  container.update(camera);
+  return [ox / vertices.length, oy / vertices.length, oz / vertices.length];
+}
 
-}); 
-runtime.start();
+function moveVertices(vertices: Vertex[], [x1, y1, z1]: Vertex): Vertex[] {
+  return vertices.map(([x, y, z]) => [x - x1, y - y1, z - z1]);
+}
+
+// function calcPointDistance(point1: Vertex, point2: PoiVertexnt) {
+//   return Math.sqrt(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2) + Math.pow(point1.z - point2.z, 2));
+// }
+
+function degToRad(deg: number) {
+  return deg * Math.PI / 180;
+}
+
+function radToDeg(rad: number) {
+  return rad * 180 / Math.PI;
+}
+
+// console.log("A", calcPoint(Math.sqrt(Math.pow(100, 2)*2), degToRad(360-90), 0));
+
+
+function calcHfov(distance: number, afov: number) {
+  return 2 * distance * Math.tan(afov / 2 * Math.PI / 180);
+};
+
