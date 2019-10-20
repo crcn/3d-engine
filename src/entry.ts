@@ -7,47 +7,59 @@ const PIXEL_MM_RATIO = IN_IN_MM / DPI;
 
 type Vertex = [number, number, number];
 type Face = Vertex[];
+type Shape = Face[];
 
 const canvas = document.createElement("canvas");
 document.body.appendChild(canvas);
 canvas.width = 1000;
 canvas.height = 1000;
 
+const createCube = (size: number): Shape => {
+  let vertices: Vertex[] = [
 
-let vertices: Vertex[] = [
-
-  [0, 0, 0],
-  [100, 0, 0],
-  [100, 100, 0],
-  [0, 100, 0],
-
-  [0, 0, 100],  
-  [100, 0, 100],
-  [100, 100, 100],
-  [0, 100, 100]
-];
-
-vertices = moveVertices(vertices, calcVerticesCenter(vertices));
-
-const faces: Face[] = [
-
-  // front
-  [vertices[0], vertices[1], vertices[2], vertices[3]],
-
-  // right
-  [vertices[1], vertices[5], vertices[6], vertices[2]],
-
-  // back
-  [vertices[4], vertices[5], vertices[6], vertices[7]],
+    [0, 0, 0],
+    [size, 0, 0],
+    [size, size, 0],
+    [0, size, 0],
   
-  // top
-  [vertices[0], vertices[4], vertices[5], vertices[1]],
+    [0, 0, size],  
+    [size, 0, size],
+    [size, size, size],
+    [0, size, size]
+  ];
 
-  // left
-  [vertices[0], vertices[3], vertices[7], vertices[4]],
+  vertices = moveVertices(vertices, calcVerticesCenter(vertices));
 
-  // bottom
-  [vertices[2], vertices[3], vertices[7], vertices[6]],
+
+  const faces: Face[] = [
+
+    // front
+    [vertices[0], vertices[1], vertices[2], vertices[3]],
+
+    // right
+    [vertices[1], vertices[5], vertices[6], vertices[2]],
+
+    // back
+    [vertices[4], vertices[5], vertices[6], vertices[7]],
+    
+    // top
+    [vertices[0], vertices[4], vertices[5], vertices[1]],
+
+    // left
+    [vertices[0], vertices[3], vertices[7], vertices[4]],
+
+    // bottom
+    [vertices[2], vertices[3], vertices[7], vertices[6]],
+  ];
+
+  return faces;
+}
+
+
+const shapes = [
+  createCube(100),
+  // translateShape(createCube(100), [100, 100, -100]),
+  // translateShape(createCube(100), [200, 200, -100])
 ];
 
 const FPS = 1000 / 30;
@@ -58,6 +70,7 @@ let roll = 0;//degToRad(90);
 let yaw = 0;//degToRad(45);
 let tick = 0;
 let tick2 = 0;
+const angleOfView = 45;
 
 const nextFrame = () => {
 
@@ -65,11 +78,18 @@ const nextFrame = () => {
   yaw = degToRad(tick % 360);
   // roll = degToRad(tick % 360);
   tick++;
-  const newFaces = faces.map(face => {
-    return moveVertices(face.map(vertex => rotateVertex(vertex, [pitch, yaw, roll])), [-200, -200, 0])
+  const newShapes = shapes.map(shape => {
+    return shape.map(face => {
+      return moveVertices(face.map(vertex => {
+        vertex = rotateVertex(vertex, [pitch, yaw, roll]);
+        vertex = scaleVertex(vertex, angleOfView);
+        // vertex = applyProjection(vertex);
+        return vertex;
+      }), [-200, -200, 0])
+    });
   });
 
-  draw(newFaces);
+  draw(newShapes);
 
   setTimeout(nextFrame, FPS);
 }
@@ -77,26 +97,32 @@ const nextFrame = () => {
 
 nextFrame();
 
-function draw(faces: Face[]) {
+function draw(shapes: Shape[]) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  for (const face of faces) {
+  for (const shape of shapes) {
+    for (const face of shape) {
 
-    const start = face[0];
-    ctx.beginPath();
-    ctx.fillStyle = 'red';
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.moveTo(start[0], start[1]);
-    for (let i = 1, {length} = face; i < length; i++) {
-      const [x, y] = face[i];
-      ctx.lineTo(x, y);
+      const start = face[0];
+      ctx.beginPath();
+      ctx.fillStyle = 'transparent';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.moveTo(start[0], start[1]);
+      for (let i = 1, {length} = face; i < length; i++) {
+        const [x, y] = face[i];
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(start[0], start[1]);
+      ctx.stroke();
+      ctx.fill();
     }
-    ctx.lineTo(start[0], start[1]);
-    ctx.stroke();
-    ctx.fill();
   }
+}
+
+function translateShape(shape: Shape, point: Vertex) {
+  return shape.map(face => moveVertices(face, point));
 }
 
 function rotateVertex([x, y, z]: Vertex, [rx, ry, rz]: Vertex): Vertex {
@@ -117,6 +143,26 @@ function rotateVertex([x, y, z]: Vertex, [rx, ry, rz]: Vertex): Vertex {
   const z4 = z3;
 
   return [x4, y4, z4];
+}
+
+function applyProjection([x, y, z]: Vertex): Vertex {
+  const w = 1;
+  const ws = 1;
+  const h = 1;
+  const near = 1;
+  return [
+    x * (w / 2) + z * (w/2),
+    y * h/2 + z * (h/2),
+    1
+  ];
+}
+
+
+function scaleVertex([x, y, z]: Vertex, angleOfView: number): Vertex {
+  const hov = 2 * z * Math.tan(degToRad(angleOfView / 2));
+  // console.log(x / hov * x, x);
+  return [x, y, z];
+  // return [x / hov * x, y / hov * y, z / hov * z];
 }
 
 function calcPoint(radius: number, theta: number, phi: number) {
