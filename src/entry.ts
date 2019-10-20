@@ -8,6 +8,17 @@ const PIXEL_MM_RATIO = IN_IN_MM / DPI;
 type Vertex = [number, number, number];
 type Face = Vertex[];
 type Shape = Face[];
+type World = Shape[];
+type Projection = [
+  [number, number, number, number],
+  [number, number, number, number],
+  [number, number, number, number],
+  [number, number, number, number]
+]
+
+type Camera = {
+
+};
 
 const canvas = document.createElement("canvas");
 document.body.appendChild(canvas);
@@ -15,83 +26,96 @@ canvas.width = 1000;
 canvas.height = 1000;
 
 const createCube = (size: number): Shape => {
-  let vertices: Vertex[] = [
+  const mult = 5;
+  const v: Vertex[] = [
 
     [0, 0, 0],
     [size, 0, 0],
     [size, size, 0],
     [0, size, 0],
   
-    [0, 0, size],  
-    [size, 0, size],
-    [size, size, size],
-    [0, size, size]
+    [0, 0, size * mult],  
+    [size, 0, size * mult],
+    [size, size, size * mult],
+    [0, size, size * 4]
   ];
 
-  vertices = moveVertices(vertices, calcVerticesCenter(vertices));
-
-
-  const faces: Face[] = [
+  return [
 
     // front
-    [vertices[0], vertices[1], vertices[2], vertices[3]],
+    [v[0], v[1], v[2], v[3]],
 
     // right
-    [vertices[1], vertices[5], vertices[6], vertices[2]],
+    [v[1], v[5], v[6], v[2]],
 
     // back
-    [vertices[4], vertices[5], vertices[6], vertices[7]],
+    [v[4], v[5], v[6], v[7]],
     
     // top
-    [vertices[0], vertices[4], vertices[5], vertices[1]],
+    [v[0], v[4], v[5], v[1]],
 
     // left
-    [vertices[0], vertices[3], vertices[7], vertices[4]],
+    [v[0], v[3], v[7], v[4]],
 
     // bottom
-    [vertices[2], vertices[3], vertices[7], vertices[6]],
+    [v[2], v[3], v[7], v[6]],
+  ];
+}
+
+function createTriangle(size: number): Shape {
+  const hyp = Math.sqrt(Math.pow(size, 2) - Math.pow(size/2, 2));
+  const v: Vertex[] = [
+    [0, 0, 0],
+    [size, 0, 0],
+    [size/2, hyp, hyp/2],
+
+    // z
+    [size/2, 0, size],
   ];
 
-  return faces;
+  return [
+
+    // front
+    [v[0], v[1], v[2]],
+
+    // right
+    [v[1], v[2], v[3]],
+
+    // left
+    [v[0], v[2], v[3]],
+
+    // // bottom
+    // [v[0], v[1], v[3]]
+  ];
 }
 
 
-const shapes = [
-  createCube(100),
-  // translateShape(createCube(100), [100, 100, -100]),
-  // translateShape(createCube(100), [200, 200, -100])
+
+let world = [
+  rotateShape(translateShape(createCube(100), [300, 300, 0]), [0.3, 1, 0]),
+  // translateShape(createCube(100), [300, 300, 0]),
+  // translateShape(createTriangle(100), [400, 100, 0]),
 ];
 
-const FPS = 1000 / 30;
+const FPS = 1000 / 20;
 
 
-let pitch = 0;//degToRad(45);
-let roll = 0;//degToRad(90);
-let yaw = 0;//degToRad(45);
-let tick = 0;
-let tick2 = 0;
-const angleOfView = 45;
 
 const nextFrame = () => {
-
-  pitch = degToRad(tick % 360);
-  yaw = degToRad(tick % 360);
-  // roll = degToRad(tick % 360);
-  tick++;
-  const newShapes = shapes.map(shape => {
-    return shape.map(face => {
-      return moveVertices(face.map(vertex => {
-        vertex = rotateVertex(vertex, [pitch, yaw, roll]);
-        vertex = scaleVertex(vertex, angleOfView);
-        // vertex = applyProjection(vertex);
-        return vertex;
-      }), [-200, -200, 0])
-    });
+  world = world.map(world => {
+    return rotateShape(world, [0.05, 0.02, 0]);
   });
 
-  draw(newShapes);
+  const projection = createProjectionMatrix(100, 50, 100);
+  console.log(projection);
 
-  setTimeout(nextFrame, FPS);
+  const pworld = world.map(shape => mapShapeVertices(shape, vertex => (
+    applyProjectionMatrix(vertex, projection)
+  )));
+
+  draw(pworld);
+
+  // setTimeout(nextFrame, FPS);
 }
 
 
@@ -121,8 +145,59 @@ function draw(shapes: Shape[]) {
   }
 }
 
-function translateShape(shape: Shape, point: Vertex) {
-  return shape.map(face => moveVertices(face, point));
+function createProjectionMatrix(angleOfView: number, near: number, far: number): Projection {
+  const aspect = 1;
+  const q = 1 / Math.tan(degToRad(angleOfView/2));
+  const a = q / aspect;
+  const b = (far + near) / (near - far);
+  const c = (2 * far * near) / (near - far);
+  const r = 1;
+
+  return [
+    [a, 0, 0, 0],
+    [0, q, 0, 0],
+    [0, 0, b, c],
+    [0, 0, -1, 0],
+  ]
+}
+
+function applyProjectionMatrix([x, y, z]: Vertex, [a, b, c, d]: Projection): Vertex {
+
+  /*
+
+  let x2 = x * a[0] + y * b[0] + z * c[0];
+  let y2 = x * a[1] + y * b[1] + z * c[2];
+  let z2 = x * a[2] + y * c[1] + z * c[2];
+  let w1 = x * a[3] + y * d[1] + z * c[2];
+
+  */
+
+  let x2 = x * a[0] + y * b[0] + z * c[0];
+  let y2 = x * a[1] + y * b[1] + z * c[1];
+  let z2 = x * a[2] + y * b[2] + z * c[2];
+  // let w1 = x * a[3] + y * b[3] + z * c[3];
+
+  return [
+    x2,
+    y2,
+    z2
+  ]
+}
+
+// function multiplyMatrix<TMatrix extends number[]>(a: TMatrix, b: number[][]): TMatrix {
+//   return a.map((v, i) => {
+//     return b[i].reduce((sum, column) => {
+//       return sum + column * a[i];
+//     }, 0);
+//   }) as TMatrix;
+// }
+
+function rotateShape(shape: Shape, rotation: Vertex): Shape {
+  const [cx, cy, cz] = calcShapeCenter(shape);
+  shape = translateShape(shape, [-cx, -cy, -cz]);
+  shape = mapShapeVertices(shape, vertex => rotateVertex(vertex, rotation));
+  shape = translateShape(shape, [cx, cy, cz]);
+  return shape;
 }
 
 function rotateVertex([x, y, z]: Vertex, [rx, ry, rz]: Vertex): Vertex {
@@ -145,65 +220,30 @@ function rotateVertex([x, y, z]: Vertex, [rx, ry, rz]: Vertex): Vertex {
   return [x4, y4, z4];
 }
 
-function applyProjection([x, y, z]: Vertex): Vertex {
-  const w = 1;
-  const ws = 1;
-  const h = 1;
-  const near = 1;
-  return [
-    x * (w / 2) + z * (w/2),
-    y * h/2 + z * (h/2),
-    1
-  ];
-}
-
-
-function scaleVertex([x, y, z]: Vertex, angleOfView: number): Vertex {
-  const hov = 2 * z * Math.tan(degToRad(angleOfView / 2));
-  // console.log(x / hov * x, x);
-  return [x, y, z];
-  // return [x / hov * x, y / hov * y, z / hov * z];
-}
-
-function calcPoint(radius: number, theta: number, phi: number) {
-  const x = radius * Math.sin(theta) * Math.cos(phi);
-  const y = radius * Math.sin(theta) * Math.sin(phi);
-  const z = radius * Math.cos(theta);
-  return [x, y, z];
-}
-
-function calcTheta(radius: number, z: number) {
-  return Math.acos(z / radius);
-}
-
-
-function calcPhi(y: number, x: number) {
-  return Math.atan2(y, x);
-}
-
-// console.log(calcPoint(70.7106, calcTheta(70.7106, -50), calcPhi(-50, 0)));
-
-
-function calcVerticesCenter(vertices: Vertex[]): Vertex {
+function calcShapeCenter(shape: Shape): Vertex {
   let ox = 0;
   let oy = 0;
   let oz = 0;
-  for (const [x, y, z] of vertices) {
-    ox += x;
-    oy += y;
-    oz += z;
+  let vertexCount = 0;
+  for (const face of shape) {
+    for (const [x, y, z] of face) {
+      vertexCount++;
+      ox += x;
+      oy += y;
+      oz += z;
+    }
   }
 
-  return [ox / vertices.length, oy / vertices.length, oz / vertices.length];
+  return [ox / vertexCount, oy / vertexCount, oz / vertexCount];
 }
 
-function moveVertices(vertices: Vertex[], [x1, y1, z1]: Vertex): Vertex[] {
-  return vertices.map(([x, y, z]) => [x - x1, y - y1, z - z1]);
+function translateShape(shape: Shape, [x1, y1, z1]: Vertex): Shape {
+  return mapShapeVertices(shape, ([x, y, z]) => [x + x1, y + y1, z + z1]);
 }
 
-// function calcPointDistance(point1: Vertex, point2: PoiVertexnt) {
-//   return Math.sqrt(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2) + Math.pow(point1.z - point2.z, 2));
-// }
+function mapShapeVertices(shape: Shape, map: (vertex: Vertex) => Vertex): Shape {
+  return shape.map(face => face.map(map));
+}
 
 function degToRad(deg: number) {
   return deg * Math.PI / 180;
@@ -212,8 +252,6 @@ function degToRad(deg: number) {
 function radToDeg(rad: number) {
   return rad * 180 / Math.PI;
 }
-
-// console.log("A", calcPoint(Math.sqrt(Math.pow(100, 2)*2), degToRad(360-90), 0));
 
 
 function calcHfov(distance: number, afov: number) {
