@@ -17,7 +17,7 @@ type Projection = [
 ]
 
 type Camera = {
-fdfsd
+// fdfsdfsdfsfdsfsd
 };
 
 const canvas = document.createElement("canvas");
