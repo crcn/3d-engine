@@ -184,6 +184,8 @@ function applyProjectionMatrix([x, y, z]: Vertex, [a, b, c, d]: Projection): Ver
   ]
 }
 
+
+
 // function multiplyMatrix<TMatrix extends number[]>(a: TMatrix, b: number[][]): TMatrix {
 //   return a.map((v, i) => {
 //     return b[i].reduce((sum, column) => {
