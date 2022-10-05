@@ -17,7 +17,7 @@ type Projection = [
 ]
 
 type Camera = {
-
+// fdfsdfsdfsfdsfsdfsdfds
 };
 
 const canvas = document.createElement("canvas");
@@ -183,6 +183,8 @@ function applyProjectionMatrix([x, y, z]: Vertex, [a, b, c, d]: Projection): Ver
     z2
   ]
 }
+
+
 
 // function multiplyMatrix<TMatrix extends number[]>(a: TMatrix, b: number[][]): TMatrix {
 //   return a.map((v, i) => {
